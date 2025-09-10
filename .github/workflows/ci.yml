@@ -21,6 +21,8 @@ jobs:
 
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          region: ap-southeast-1
 
       - name: Build and tag Docker image
         run: |

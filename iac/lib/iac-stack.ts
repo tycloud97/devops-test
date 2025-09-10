@@ -64,6 +64,12 @@ export class IacStack extends cdk.Stack {
       vpcSubnets: {
         subnets: [publicSubnets, publicSubnets2],
       },
+      deploymentController: {
+        type: ecs.DeploymentControllerType.ECS,
+      },
+      circuitBreaker: { rollback: false },
+      minHealthyPercent: 0,
+      maxHealthyPercent: 100,
     });
 
     const httpsListener = alb.addListener('HttpsListener', {

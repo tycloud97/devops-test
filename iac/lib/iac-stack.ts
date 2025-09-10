@@ -67,8 +67,8 @@ export class IacStack extends cdk.Stack {
       deploymentController: {
         type: ecs.DeploymentControllerType.ECS,
       },
-      circuitBreaker: { rollback: false },
-      minHealthyPercent: 50,
+      circuitBreaker: { rollback: true },
+      minHealthyPercent: 100,
       maxHealthyPercent: 200,
     });
 

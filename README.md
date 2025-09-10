@@ -2,6 +2,31 @@
 
 This repository contains a minimal Flask application exposed via a `/healthcheck` endpoint. Dependencies are managed with [Poetry](https://python-poetry.org/) and the app is containerised with Docker for easy local development and deployment.
 
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+  user["User / Client"] -->|HTTPS 443| alb["Existing Application Load Balancer"]
+
+  subgraph vpc["Existing VPC"]
+    alb --> |Listener 443 ACM Cert| tg["Target Group → HTTP 3000"]
+
+    subgraph public["Public Subnets (Imported)"]
+      tg --> svc["ECS Fargate Service\nDesiredCount=1, Public IP"]
+      svc --> task["Task Definition\nCPU: 256, Mem: 512\nAppContainer: Flask :3000"]
+      task --> logs["CloudWatch Logs"]
+    end
+  end
+
+  task -->|Pull image| ecr["Existing ECR Repository"]
+  task -->|Task/Exec| iam["Existing IAM Roles"]
+```
+
+Notes:
+- Pre-existing resources: VPC, Public Subnets, ALB, ACM Certificate, IAM Roles, ECR.
+- Provisioned via CDK: ECS Cluster, Task Definition, Fargate Service, ALB HTTPS Listener + Target Group.
+
+
 # Tech Stack
 
 - Application: Python + Flask web service on port `3000`.
@@ -41,6 +66,8 @@ This repository contains a minimal Flask application exposed via a `/healthcheck
 - Image tag: From `IMAGE_TAG` environment variable, defaults to `latest`.
 - Stage: From `ENV_STAGE` environment variable, defaults to `dev`.
 - Health endpoint: `/healthcheck` returns 200 with environment and version.
+
+
 
 ## Local development
 
@@ -82,28 +109,3 @@ docker push <account>.dkr.ecr.<region>.amazonaws.com/devops-test:latest
 cd iac
 npx cdk deploy
 ```
-
-## Architecture Diagram
-
-```mermaid
-flowchart TB
-  user["User / Client"] -->|HTTPS 443| alb["Existing Application Load Balancer"]
-
-  subgraph vpc["Existing VPC"]
-    alb --> |Listener 443 ACM Cert| tg["Target Group → HTTP 3000"]
-
-    subgraph public["Public Subnets (Imported)"]
-      tg --> svc["ECS Fargate Service\nDesiredCount=1, Public IP"]
-      svc --> task["Task Definition\nCPU: 256, Mem: 512\nAppContainer: Flask :3000"]
-      task --> logs["CloudWatch Logs"]
-    end
-  end
-
-  task -->|Pull image| ecr["Existing ECR Repository"]
-  task -->|Task/Exec| iam["Existing IAM Roles"]
-```
-
-Notes:
-- Pre-existing resources: VPC, Public Subnets, ALB, ACM Certificate, IAM Roles, ECR.
-- Provisioned via CDK: ECS Cluster, Task Definition, Fargate Service, ALB HTTPS Listener + Target Group.
-

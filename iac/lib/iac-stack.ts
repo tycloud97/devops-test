@@ -68,8 +68,8 @@ export class IacStack extends cdk.Stack {
         type: ecs.DeploymentControllerType.ECS,
       },
       circuitBreaker: { rollback: false },
-      minHealthyPercent: 0,
-      maxHealthyPercent: 100,
+      minHealthyPercent: 50,
+      maxHealthyPercent: 200,
     });
 
     const httpsListener = alb.addListener('HttpsListener', {
@@ -86,6 +86,10 @@ export class IacStack extends cdk.Stack {
       healthCheck: {
         path: '/healthcheck',
         healthyHttpCodes: '200',
+        interval: cdk.Duration.seconds(5),
+        timeout: cdk.Duration.seconds(2),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 2,
       },
     });
   }

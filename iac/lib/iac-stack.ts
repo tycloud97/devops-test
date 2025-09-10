@@ -64,7 +64,7 @@ export class IacStack extends cdk.Stack {
     const service = new ecs.FargateService(this, 'AppService', {
       cluster,
       taskDefinition: taskDef,
-      desiredCount: 2,
+      desiredCount: 1,
       assignPublicIp: true,
       vpcSubnets: {
         subnets: publicSubnets,

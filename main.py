@@ -13,7 +13,7 @@ def healthcheck():
             "status": "ok",
             "app_env": os.getenv("APP_ENV"),
             "timestamp": datetime.now().isoformat(),
-            "version": "1.0.4"
+            "version": "1.0.5"
         }
     ))
 

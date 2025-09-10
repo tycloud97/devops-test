@@ -61,7 +61,7 @@ export class IacStack extends cdk.Stack {
     });
 
     // Map public subnet IDs to Subnet objects
-    const publicSubnetRefs = stageConfig.publicSubnetIds.map((subnetId, idx) =>
+    const publicSubnets = stageConfig.publicSubnetIds.map((subnetId, idx) =>
       ec2.Subnet.fromSubnetId(this, `PublicSubnet${idx + 1}`, subnetId),
     );
 
@@ -72,7 +72,7 @@ export class IacStack extends cdk.Stack {
       desiredCount: 1,
       assignPublicIp: true,
       vpcSubnets: {
-        subnets: publicSubnetRefs,
+        subnets: publicSubnets,
       },
       deploymentController: {
         type: ecs.DeploymentControllerType.ECS,

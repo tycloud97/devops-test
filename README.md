@@ -109,3 +109,45 @@ docker push <account>.dkr.ecr.<region>.amazonaws.com/devops-test:latest
 cd iac
 npx cdk deploy
 ```
+
+## CI/CD
+
+- Trigger: Pushes to `main` run three jobs in sequence: Build → Test → Deploy.
+- Image Tagging: Sets `IMAGE_TAG` to the commit SHA for traceable, immutable builds.
+- Flow: Build and push Docker image to ECR → run tests using the same image → deploy CDK stack with that `IMAGE_TAG`.
+
+### Build
+- Purpose: Produce and publish a versioned Docker image.
+- Steps:
+  - Checkout repository and configure AWS credentials.
+  - Set up Docker Buildx and log in to Amazon ECR.
+  - Build image; tag with commit SHA (`IMAGE_TAG`) and `latest`.
+  - Push both tags to ECR.
+- Input: `secrets.ECR_REPOSITORY`, `AWS_*` secrets, `IMAGE_TAG`.
+- Output: Image in ECR at `<ECR_REPOSITORY>:<IMAGE_TAG>` and `<ECR_REPOSITORY>:latest`.
+
+### Test
+- Purpose: Validate the build using the same image that will be deployed.
+- Steps:
+  - Checkout repository, configure AWS, log in to ECR.
+  - Pull image from ECR using `IMAGE_TAG`.
+  - Run `poetry run pytest -s` inside the container.
+- Input: `<ECR_REPOSITORY>:<IMAGE_TAG>`.
+- Output: Test results; gate for deployment.
+
+### Deploy
+- Purpose: Update the running service to the new image.
+- Conditions: Runs only on `main` and after Test succeeds.
+- Steps:
+  - Checkout repository; configure AWS credentials.
+  - Set up Node.js 20; install CDK and dependencies in `iac/`.
+  - Deploy: `IMAGE_TAG=${GITHUB_SHA} npx cdk deploy --require-approval never`.
+- Effect:
+  - CDK uses `IMAGE_TAG` to update the ECS Fargate Task Definition.
+  - ECS Service behind the existing ALB is refreshed; `/healthcheck` controls rollout via target group health checks.
+
+### Required GitHub Secrets
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`: AWS credentials and region.
+- `ECR_REPOSITORY`: Fully qualified ECR repository (e.g. `<account>.dkr.ecr.<region>.amazonaws.com/devops-test`).
+
+Workflow file: `.github/workflows/ci.yml`

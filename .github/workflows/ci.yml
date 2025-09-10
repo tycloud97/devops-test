@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: latest
 
 jobs:
   build:

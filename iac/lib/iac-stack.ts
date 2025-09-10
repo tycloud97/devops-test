@@ -48,6 +48,9 @@ export class IacStack extends cdk.Stack {
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'App' }),
       portMappings: [{ containerPort: 3000 }],
       command: ['bash', '-c', 'ls -al && /bin/bash run.sh'],
+      environment: {
+        APP_ENV: 'dev',
+      },
     });
 
     const publicSubnets = ec2.Subnet.fromSubnetId(this, 'PublicSubnet1', 'subnet-0bbeea90fa964cf14');

@@ -1,14 +1,20 @@
-# Welcome to your CDK TypeScript project
+# Infrastructure as Code
 
-This is a blank project for CDK development with TypeScript.
+This directory contains an AWS CDK stack that wires the container image into an ECS Fargate service.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Stack overview
+
+The `IacStack` defined in `lib/iac-stack.ts` performs the following:
+
+- Imports existing networking and security resources defined in `lib/config.ts`, including a VPC, public subnets, IAM roles, an Application Load Balancer, and an ACM certificate.
+- Creates an ECS cluster and Fargate task definition that pulls the application image from ECR.
+- Provisions a Fargate service and registers it behind the ALB via an HTTPS listener with `/healthcheck` monitoring.
 
 ## Useful commands
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+- `npm run build` – compile TypeScript to JavaScript
+- `npm run watch` – watch for changes and compile
+- `npm run test` – run Jest unit tests
+- `npx cdk synth` – emit the CloudFormation template
+- `npx cdk diff` – compare stack state
+- `npx cdk deploy` – deploy the stack to the configured account/region

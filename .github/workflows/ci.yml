@@ -89,10 +89,12 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
+        working-directory: iac
         run: |
           npm install -g aws-cdk
           npm ci
       
       - name: Deploy with CDK
+        working-directory: iac
         run: |
           IMAGE_TAG=${{ github.sha }} npx cdk deploy --require-approval never

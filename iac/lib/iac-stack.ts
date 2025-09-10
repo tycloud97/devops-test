@@ -6,30 +6,32 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 
+import { config, ENV_STAGE } from './config';
+
+type StageName = keyof typeof config;
+
 export class IacStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const vpcId = 'vpc-08110f24efd134cae';
-    const albArn = 'arn:aws:elasticloadbalancing:ap-southeast-1:827539266883:loadbalancer/app/devops-test/30749bda016cc2a2';
-    const certificateArn = 'arn:aws:acm:ap-southeast-1:827539266883:certificate/f8f76683-31f8-41a3-8f44-18600a75262d';
-    const taskRoleArn = 'arn:aws:iam::827539266883:role/devops-test-ecs-task-role';
-    const executionRoleArn = 'arn:aws:iam::827539266883:role/devops-test-ecs-execution-role';
-
-    // Create ECR Repository
-    const ecrRepo = cdk.aws_ecr.Repository.fromRepositoryName(this, 'AppEcrRepo', 'devops-test');
+    // Ensure ENV_STAGE is a valid key of config, fallback to 'dev'
+    const stage: StageName = (ENV_STAGE in config ? ENV_STAGE : 'dev') as StageName;
+    const stageConfig = config[stage];
 
     // Import existing VPC
-    const vpc = ec2.Vpc.fromLookup(this, 'Vpc', { vpcId });
+    const vpc = ec2.Vpc.fromLookup(this, 'Vpc', { vpcId: stageConfig.vpcId });
 
     // Import existing ALB and Listener
-    const alb = elbv2.ApplicationLoadBalancer.fromLookup(this, 'ALB', { loadBalancerArn: albArn });
+    const alb = elbv2.ApplicationLoadBalancer.fromLookup(this, 'ALB', { loadBalancerArn: stageConfig.albArn });
 
     // Import existing ACM certificate
-    const certificate = certificatemanager.Certificate.fromCertificateArn(this, 'Cert', certificateArn);
+    const certificate = certificatemanager.Certificate.fromCertificateArn(this, 'Cert', stageConfig.certificateArn);
 
-    const taskRole = iam.Role.fromRoleArn(this, 'TaskRole', taskRoleArn);
-    const executionRole = iam.Role.fromRoleArn(this, 'ExecutionRole', executionRoleArn);
+    // Import ECR Repository
+    const ecrRepo = cdk.aws_ecr.Repository.fromRepositoryName(this, 'AppEcrRepo', stageConfig.ecrRepoName);
+
+    const taskRole = iam.Role.fromRoleArn(this, 'TaskRole', stageConfig.taskRoleArn);
+    const executionRole = iam.Role.fromRoleArn(this, 'ExecutionRole', stageConfig.executionRoleArn);
 
     const cluster = new ecs.Cluster(this, 'AppCluster', {
       vpc,
@@ -49,12 +51,14 @@ export class IacStack extends cdk.Stack {
       portMappings: [{ containerPort: 3000 }],
       command: ['bash', '-c', 'ls -al && /bin/bash run.sh'],
       environment: {
-        APP_ENV: 'dev',
+        APP_ENV: ENV_STAGE,
       },
     });
 
-    const publicSubnets = ec2.Subnet.fromSubnetId(this, 'PublicSubnet1', 'subnet-0bbeea90fa964cf14');
-    const publicSubnets2 = ec2.Subnet.fromSubnetId(this, 'PublicSubnet2', 'subnet-0223f701ff20176e2');
+    // Import public subnets
+    const publicSubnets = stageConfig.publicSubnetIds.map((subnetId, idx) =>
+      ec2.Subnet.fromSubnetId(this, `PublicSubnet${idx + 1}`, subnetId)
+    );
 
     const service = new ecs.FargateService(this, 'AppService', {
       cluster,
@@ -62,7 +66,7 @@ export class IacStack extends cdk.Stack {
       desiredCount: 1,
       assignPublicIp: true,
       vpcSubnets: {
-        subnets: [publicSubnets, publicSubnets2],
+        subnets: publicSubnets,
       },
       deploymentController: {
         type: ecs.DeploymentControllerType.ECS,

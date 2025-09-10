@@ -14,40 +14,44 @@ export class IacStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Ensure ENV_STAGE is a valid key of config, fallback to 'dev'
-    const stage: StageName = (ENV_STAGE in config ? ENV_STAGE : 'dev') as StageName;
-    const stageConfig = config[stage];
+    // Determine deployment stage; default to 'dev' when ENV_STAGE is unset
+    const deploymentStage: StageName = (ENV_STAGE in config ? ENV_STAGE : 'dev') as StageName;
+    const stageConfig = config[deploymentStage];
 
-    // Import existing VPC
-    const vpc = ec2.Vpc.fromLookup(this, 'Vpc', { vpcId: stageConfig.vpcId });
+    // Import existing networking and security resources
+    const importedVpc = ec2.Vpc.fromLookup(this, 'Vpc', { vpcId: stageConfig.vpcId });
+    const importedAlb = elbv2.ApplicationLoadBalancer.fromLookup(this, 'ALB', {
+      loadBalancerArn: stageConfig.albArn,
+    });
+    const importedCertificate = certificatemanager.Certificate.fromCertificateArn(
+      this,
+      'Cert',
+      stageConfig.certificateArn,
+    );
 
-    // Import existing ALB and Listener
-    const alb = elbv2.ApplicationLoadBalancer.fromLookup(this, 'ALB', { loadBalancerArn: stageConfig.albArn });
-
-    // Import existing ACM certificate
-    const certificate = certificatemanager.Certificate.fromCertificateArn(this, 'Cert', stageConfig.certificateArn);
-
-    // Import ECR Repository
-    const ecrRepo = cdk.aws_ecr.Repository.fromRepositoryName(this, 'AppEcrRepo', stageConfig.ecrRepoName);
-
+    // Reference existing ECR repository and IAM roles
+    const appRepository = cdk.aws_ecr.Repository.fromRepositoryName(this, 'AppEcrRepo', stageConfig.ecrRepoName);
     const taskRole = iam.Role.fromRoleArn(this, 'TaskRole', stageConfig.taskRoleArn);
     const executionRole = iam.Role.fromRoleArn(this, 'ExecutionRole', stageConfig.executionRoleArn);
 
+    // Define an ECS cluster within the imported VPC
     const cluster = new ecs.Cluster(this, 'AppCluster', {
-      vpc,
+      vpc: importedVpc,
       clusterName: 'MyAppCluster',
     });
 
-    const taskDef = new ecs.FargateTaskDefinition(this, 'TaskDef', {
+    // Task definition for the application container
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDef', {
       memoryLimitMiB: 512,
       cpu: 256,
       taskRole,
       executionRole,
     });
 
-    const imageTag = process.env.IMAGE_TAG ?? 'latest';
-    const container = taskDef.addContainer('AppContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(ecrRepo, imageTag),
+    // Determine container image tag and container configuration
+    const containerImageTag = process.env.IMAGE_TAG ?? 'latest';
+    const appContainer = taskDefinition.addContainer('AppContainer', {
+      image: ecs.ContainerImage.fromEcrRepository(appRepository, containerImageTag),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'App' }),
       portMappings: [{ containerPort: 3000 }],
       command: ['bash', '-c', 'ls -al && /bin/bash run.sh'],
@@ -56,18 +60,19 @@ export class IacStack extends cdk.Stack {
       },
     });
 
-    // Import public subnets
-    const publicSubnets = stageConfig.publicSubnetIds.map((subnetId, idx) =>
-      ec2.Subnet.fromSubnetId(this, `PublicSubnet${idx + 1}`, subnetId)
+    // Map public subnet IDs to Subnet objects
+    const publicSubnetRefs = stageConfig.publicSubnetIds.map((subnetId, idx) =>
+      ec2.Subnet.fromSubnetId(this, `PublicSubnet${idx + 1}`, subnetId),
     );
 
+    // ECS Fargate service to run the application
     const service = new ecs.FargateService(this, 'AppService', {
       cluster,
-      taskDefinition: taskDef,
+      taskDefinition,
       desiredCount: 1,
       assignPublicIp: true,
       vpcSubnets: {
-        subnets: publicSubnets,
+        subnets: publicSubnetRefs,
       },
       deploymentController: {
         type: ecs.DeploymentControllerType.ECS,
@@ -77,13 +82,15 @@ export class IacStack extends cdk.Stack {
       maxHealthyPercent: 200,
     });
 
-    const httpsListener = alb.addListener('HttpsListener', {
+    // HTTPS listener on the existing ALB
+    const httpsListener = importedAlb.addListener('HttpsListener', {
       port: 443,
       open: true,
       protocol: elbv2.ApplicationProtocol.HTTPS,
-      certificates: [certificate],
+      certificates: [importedCertificate],
     });
 
+    // Forward HTTPS traffic to the ECS service and configure health checks
     httpsListener.addTargets('AppECS', {
       port: 3000,
       targets: [service],

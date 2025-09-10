@@ -11,8 +11,7 @@ export const config = {
         taskRoleArn: 'arn:aws:iam::827539266883:role/devops-test-ecs-task-role',
         executionRoleArn: 'arn:aws:iam::827539266883:role/devops-test-ecs-execution-role',
         ecrRepoName: 'devops-test',
-        publicSubnetIds: ['subnet-0bbeea90fa964cf14', 'subnet-0223f701ff20176e2',
-        ],
+        publicSubnetIds: ['subnet-0bbeea90fa964cf14', 'subnet-0223f701ff20176e2'],
     },
     // Add more stages (e.g., prod) as needed
 };

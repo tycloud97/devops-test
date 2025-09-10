@@ -82,26 +82,17 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      # Ensure ECS TaskDef uses SHA-tagged image
-      - name: Download ECS task definition
+      - name: Install dependencies
         run: |
-          aws ecs describe-task-definition \
-            --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
-            --query taskDefinition > task-definition.json
-
-      - name: Update image in task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: AppContainer
-          image: ${{ secrets.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-
-      - name: Deploy to ECS service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ secrets.ECS_SERVICE }}
-          cluster: ${{ secrets.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          npm install -g aws-cdk
+          npm ci
+      
+      - name: Deploy with CDK
+        run: |
+          IMAGE_TAG=${{ github.sha }} npx cdk deploy --require-approval never

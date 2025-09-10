@@ -45,8 +45,9 @@ export class IacStack extends cdk.Stack {
       executionRole,
     });
 
+    const imageTag = process.env.IMAGE_TAG ?? 'latest';
     const container = taskDef.addContainer('AppContainer', {
-      image: ecs.ContainerImage.fromEcrRepository(ecrRepo, 'latest'),
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepo, imageTag),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'App' }),
       portMappings: [{ containerPort: 3000 }],
       command: ['bash', '-c', 'ls -al && /bin/bash run.sh'],
@@ -63,7 +64,7 @@ export class IacStack extends cdk.Stack {
     const service = new ecs.FargateService(this, 'AppService', {
       cluster,
       taskDefinition: taskDef,
-      desiredCount: 1,
+      desiredCount: 2,
       assignPublicIp: true,
       vpcSubnets: {
         subnets: publicSubnets,

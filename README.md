@@ -2,6 +2,8 @@
 
 This repository contains a minimal Flask application exposed via a `/healthcheck` endpoint. Dependencies are managed with [Poetry](https://python-poetry.org/) and the app is containerised with Docker for easy local development and deployment.
 
+  ![alt text](./docs/image.png)
+
 ## Architecture Diagram
 
 ```mermaid
@@ -33,16 +35,7 @@ Notes:
 - Packaging: Poetry for dependency management.
 - Containerization: Dockerfile and docker-compose for local development.
 - Infrastructure as Code: AWS CDK (TypeScript) for ECS/Fargate + ALB wiring.
-- Logging: Amazon CloudWatch Logs via ECS log driver.
-
-## AWS Services
-
-- ECS Fargate: Serverless container orchestration for the application.
-- Networking: Existing VPC and public subnets are imported.
-- Load Balancing: Existing Application Load Balancer with an HTTPS listener.
-- Container Registry: Existing Amazon ECR repository for container images.
-- IAM: Existing task and execution roles for the ECS task.
-- TLS: Existing ACM certificate used for HTTPS termination on ALB.
+- CI/CD: GitHub Actions workflow (`.github/workflows/ci.yml`) builds, tests, and deploys via CDK.
 
 ## Provisioned Resources (CDK)
 
@@ -60,14 +53,12 @@ Notes:
 - Application Load Balancer: Provided via `albArn`.
 - ACM Certificate: Provided via `certificateArn`.
 - ECR Repository: Provided via `ecrRepoName`.
-- IAM Roles: Task and execution roles provided via ARNs.
+- IAM Roles: Task and execution roles provided via ARNs via `taskRoleArn` and `executionRoleArn`.
 
 ## Runtime/Deploy Notes
 - Image tag: From `IMAGE_TAG` environment variable, defaults to `latest`.
 - Stage: From `ENV_STAGE` environment variable, defaults to `dev`.
 - Health endpoint: `/healthcheck` returns 200 with environment and version.
-
-
 
 ## Local development
 
@@ -107,6 +98,7 @@ docker push <account>.dkr.ecr.<region>.amazonaws.com/devops-test:latest
 
 ```bash
 cd iac
+npm ci
 npx cdk deploy
 ```
 
@@ -115,6 +107,8 @@ npx cdk deploy
 - Trigger: Pushes to `main` run three jobs in sequence: Build → Test → Deploy.
 - Image Tagging: Sets `IMAGE_TAG` to the commit SHA for traceable, immutable builds.
 - Flow: Build and push Docker image to ECR → run tests using the same image → deploy CDK stack with that `IMAGE_TAG`.
+
+  ![alt text](./docs/image-1.png)
 
 ### Build
 - Purpose: Produce and publish a versioned Docker image.
@@ -126,6 +120,8 @@ npx cdk deploy
 - Input: `secrets.ECR_REPOSITORY`, `AWS_*` secrets, `IMAGE_TAG`.
 - Output: Image in ECR at `<ECR_REPOSITORY>:<IMAGE_TAG>` and `<ECR_REPOSITORY>:latest`.
 
+  ![alt text](./docs/image-2.png)
+
 ### Test
 - Purpose: Validate the build using the same image that will be deployed.
 - Steps:
@@ -134,6 +130,8 @@ npx cdk deploy
   - Run `poetry run pytest -s` inside the container.
 - Input: `<ECR_REPOSITORY>:<IMAGE_TAG>`.
 - Output: Test results; gate for deployment.
+
+  ![alt text](./docs/image-3.png)
 
 ### Deploy
 - Purpose: Update the running service to the new image.
@@ -146,8 +144,14 @@ npx cdk deploy
   - CDK uses `IMAGE_TAG` to update the ECS Fargate Task Definition.
   - ECS Service behind the existing ALB is refreshed; `/healthcheck` controls rollout via target group health checks.
 
+  ![alt text](./docs/image-4.png)
+
 ### Required GitHub Secrets
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`: AWS credentials and region.
 - `ECR_REPOSITORY`: Fully qualified ECR repository (e.g. `<account>.dkr.ecr.<region>.amazonaws.com/devops-test`).
 
+  ![alt text](./docs/image-5.png)
+
 Workflow file: `.github/workflows/ci.yml`
+
+

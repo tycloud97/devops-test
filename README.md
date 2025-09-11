@@ -2,7 +2,7 @@
 
 This repository contains a minimal Flask application exposed via a `/healthcheck` endpoint. Dependencies are managed with [Poetry](https://python-poetry.org/) and the app is containerised with Docker for easy local development and deployment.
 
-  ![alt text](./docs/image.png)
+![alt text](./docs/image.png)
 
 ## Architecture Diagram
 
@@ -25,6 +25,7 @@ flowchart TB
 ```
 
 Notes:
+
 - Pre-existing resources: VPC, Public Subnets, ALB, ACM Certificate, IAM Roles, ECR.
 - Provisioned via CDK: ECS Cluster, Task Definition, Fargate Service, ALB HTTPS Listener + Target Group.
 
@@ -56,6 +57,7 @@ Notes:
 - IAM Roles: Task and execution roles provided via ARNs via `taskRoleArn` and `executionRoleArn`.
 
 ## Runtime/Deploy Notes
+
 - Image tag: From `IMAGE_TAG` environment variable, defaults to `latest`.
 - Stage: From `ENV_STAGE` environment variable, defaults to `dev`.
 - Health endpoint: `/healthcheck` returns 200 with environment and version.
@@ -108,9 +110,10 @@ npx cdk deploy
 - Image Tagging: Sets `IMAGE_TAG` to the commit SHA for traceable, immutable builds.
 - Flow: Build and push Docker image to ECR → run tests using the same image → deploy CDK stack with that `IMAGE_TAG`.
 
-  ![alt text](./docs/image-1.png)
+![alt text](./docs/image-1.png)
 
 ### Build
+
 - Purpose: Produce and publish a versioned Docker image.
 - Steps:
   - Checkout repository and configure AWS credentials.
@@ -120,9 +123,10 @@ npx cdk deploy
 - Input: `secrets.ECR_REPOSITORY`, `AWS_*` secrets, `IMAGE_TAG`.
 - Output: Image in ECR at `<ECR_REPOSITORY>:<IMAGE_TAG>` and `<ECR_REPOSITORY>:latest`.
 
-  ![alt text](./docs/image-2.png)
+![alt text](./docs/image-2.png)
 
 ### Test
+
 - Purpose: Validate the build using the same image that will be deployed.
 - Steps:
   - Checkout repository, configure AWS, log in to ECR.
@@ -131,9 +135,10 @@ npx cdk deploy
 - Input: `<ECR_REPOSITORY>:<IMAGE_TAG>`.
 - Output: Test results; gate for deployment.
 
-  ![alt text](./docs/image-3.png)
+![alt text](./docs/image-3.png)
 
 ### Deploy
+
 - Purpose: Update the running service to the new image.
 - Conditions: Runs only on `main` and after Test succeeds.
 - Steps:
@@ -144,14 +149,13 @@ npx cdk deploy
   - CDK uses `IMAGE_TAG` to update the ECS Fargate Task Definition.
   - ECS Service behind the existing ALB is refreshed; `/healthcheck` controls rollout via target group health checks.
 
-  ![alt text](./docs/image-4.png)
+![alt text](./docs/image-4.png)
 
 ### Required GitHub Secrets
+
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`: AWS credentials and region.
 - `ECR_REPOSITORY`: Fully qualified ECR repository (e.g. `<account>.dkr.ecr.<region>.amazonaws.com/devops-test`).
 
-  ![alt text](./docs/image-5.png)
+![alt text](./docs/image-5.png)
 
 Workflow file: `.github/workflows/ci.yml`
-
-

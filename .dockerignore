@@ -1,9 +1,0 @@
-.pytest_cache
-.env*
-!.env.example
-.venv
-__pycache__
-docker
-*.zip
-client_secrets.json
-mycreds.txt
